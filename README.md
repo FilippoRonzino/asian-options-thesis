@@ -1,2 +1,1 @@
-# bsc-thesis
-BSc Thesis - Bocconi University
+# Asian Options Pricing: From Analytical Solutions to Monte Carlo Simulations and Machine Learning
