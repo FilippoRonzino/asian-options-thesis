@@ -7,8 +7,8 @@ class AsianOption(BaseOption):
         """
         Initialize Asian option
 
-        :patam n_steps: Number of time steps for averaging
-        :pram option_type: 'arithmetic' or 'geometric'
+        :param n_steps: Number of time steps for averaging
+        :param option_type: 'arithmetic' or 'geometric'
         """
         super().__init__(S0, K, T, r, sigma)
         self.n_steps = n_steps
