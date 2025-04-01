@@ -1,4 +1,4 @@
-from src.monte_carlo.asianoption import AsianOption
+from asianoption import AsianOption
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
@@ -60,24 +60,34 @@ class MCPricer:
         else:
             return option.payoff(paths)
 
-    def price(self, option, use_control_variate=False) -> float:
+    def price(self, option, use_control_variate=False, train_size=0.8) -> float:
         """
-        Calculate option price
+        Calculate option price with an optional train-test split
         
         :param option: Option object
         :param use_control_variate: True to use control variate technique
-        :return: Option price by discounted average of payoffs
+        :param train_size: Proportion of paths to use for training (default: 0.8)
+        :return: Option price
         """
         payoffs = self.calculate_payoffs(option, use_control_variate)
-        return np.exp(-option.r * option.T) * np.mean(payoffs)
+        train_index = int(self.n_sims * train_size)
 
-    def std_error(self, option, use_control_variate=False) -> float:
+        train_payoffs = payoffs[:train_index]
+
+        return np.exp(-option.r * option.T) * np.mean(train_payoffs)
+
+    def std_error(self, option, use_control_variate=False, train_size=0.8) -> float:
         """
-        Calculate standard error of the price estimate
+        Calculate standard error of the price estimate using train-test split
         
         :param option: Option object
         :param use_control_variate: True to use control variate technique
+        :param train_size: Proportion of paths to use for training (default: 0.8)
         :return: Standard error of the price estimate
         """
         payoffs = self.calculate_payoffs(option, use_control_variate)
-        return np.exp(-option.r * option.T) * np.std(payoffs) / np.sqrt(self.n_sims)
+        train_index = int(self.n_sims * train_size)
+
+        test_payoffs = payoffs[train_index:]
+
+        return np.exp(-option.r * option.T) * np.std(test_payoffs) / np.sqrt(len(test_payoffs))

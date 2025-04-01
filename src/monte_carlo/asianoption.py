@@ -1,4 +1,4 @@
-from src.monte_carlo.baseoption import BaseOption
+from baseoption import BaseOption
 import numpy as np
 from scipy.stats import norm
 
