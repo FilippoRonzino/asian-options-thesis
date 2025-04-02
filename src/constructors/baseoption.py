@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BaseOption(ABC):
     def __init__(self, S0, K, T, r, sigma):
         """

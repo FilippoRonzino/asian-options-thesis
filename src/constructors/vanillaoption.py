@@ -1,5 +1,6 @@
-from baseoption import BaseOption
 import numpy as np
+from baseoption import BaseOption
+
 
 class VanillaOption(BaseOption):
     def __init__(self, S0, K, T, r, sigma, option_type='european'):

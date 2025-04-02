@@ -1,6 +1,7 @@
-from baseoption import BaseOption
 import numpy as np
+from baseoption import BaseOption
 from scipy.stats import norm
+
 
 class AsianOption(BaseOption):
     def __init__(self, S0, K, T, r, sigma, n_steps, option_type='arithmetic'):
@@ -34,7 +35,7 @@ class AsianOption(BaseOption):
 
         :return: Option price
         """
-        dt = self.T / self.n_steps
+        # dt = self.T / self.n_steps
         adjusted_sigma = self.sigma * np.sqrt((2 * self.n_steps + 1) / (6 * (self.n_steps + 1)))
         adjusted_r = (self.r - 0.5 * self.sigma**2) * (self.n_steps + 1) / (2 * self.n_steps) + \
                     0.5 * adjusted_sigma**2
