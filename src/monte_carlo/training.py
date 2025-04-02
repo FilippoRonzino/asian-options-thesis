@@ -32,20 +32,13 @@ class LSTMOptionPricer:
         """
         Initialize the LSTM option pricer.
         
-        Parameters:
-        -----------
-        lstm_units : list
-            Number of units in each LSTM layer
-        dropout_rate : float
-            Dropout rate for regularization
-        learning_rate : float
-            Learning rate for Adam optimizer
-        bidirectional : bool
-            Whether to use bidirectional LSTM layers
-        lookback_window : int
-            Number of time steps to look back for time series data
-        option_type : str
-            Type of option to price ('regular', 'asian', etc.)
+        :param lstm_units: Number of units in each LSTM layer
+        :param dropout_rate: Dropout rate for regularization
+        :param learning_rate: Learning rate for Adam optimizer
+        :param bidirectional: Whether to use bidirectional LSTM layers
+        :param lookback_window: Number of time steps to look back for time series data
+        :param option_type: Type of option to price ('regular', 'asian', etc.)
+        :return: None
         """
         self.lstm_units = lstm_units
         self.dropout_rate = dropout_rate
@@ -59,7 +52,12 @@ class LSTMOptionPricer:
         self.is_trained = False
     
     def _build_model(self, input_shape):
-        """Build the LSTM model architecture."""
+        """
+        Build the LSTM model architecture.
+
+        :param input_shape: Shape of the input data (timesteps, features)
+        :return: Compiled LSTM model
+        """
         model = Sequential()
         
         # First LSTM layer
@@ -93,7 +91,6 @@ class LSTMOptionPricer:
         # Output layer
         model.add(Dense(1, activation='linear'))
         
-        # Compile the model
         model.compile(
             optimizer=Adam(learning_rate=self.learning_rate),
             loss='mse'
@@ -102,76 +99,58 @@ class LSTMOptionPricer:
         return model
 
     def _prepare_time_series(self, option_configs, prices=None, historical_data=None):
-        """Convert option configurations to time series format for LSTM.
-        
-        Parameters:
-        -----------
-        option_configs : list of dict
-            List of option configuration dictionaries
-        prices : list or ndarray, optional
-            Option prices for training data
-        historical_data : DataFrame, optional
-            DataFrame containing historical time series data for options
         """
-        # Generate features from option configurations
+        Convert option configurations to time series format for LSTM.
+        
+        :param option_configs: List of option configuration dictionaries
+        :param prices: Option prices for training data
+        :param historical_data: DataFrame containing historical time series data for options
+        """
         features = []
         for config in option_configs:
-            # Extract basic option parameters
             S0 = config['S0']
             K = config['K']
             T = config['T']
             r = config['r']
             sigma = config['sigma']
             
-            # Common derived features
+            # common derived features
             moneyness = S0 / K
             log_moneyness = np.log(moneyness)
             sigma_sqrt_t = sigma * np.sqrt(T)
             time_decay_factor = np.exp(-r * T)
             
-            # Base feature vector
             feature_vector = [S0, K, T, r, sigma, moneyness, log_moneyness, sigma_sqrt_t, time_decay_factor]
             features.append(feature_vector)
         
-        # Scale features
         features = np.array(features)
         if not self.is_trained:
             self.feature_scaler.fit(features)
         features_scaled = self.feature_scaler.transform(features)
         
-        # Create time series data
         X = []
         
-        # If we have historical data, use it
+        # if we have historical data, use it
         if historical_data is not None:
             for i, config in enumerate(option_configs):
                 security_des = config.get('name', None)
                 if security_des is None:
-                    # Skip if no security description
                     continue
                     
-                # Filter historical data for this security
                 option_history = historical_data[historical_data['SECURITY_DES'] == security_des]
-                
-                # Sort by date to ensure proper time ordering
                 option_history = option_history.sort_values('Date')
                 
-                # Skip if not enough historical data
                 if len(option_history) < self.lookback_window:
-                    # Could either skip or use padding
                     continue
                     
-                # Take the most recent lookback_window data points
                 recent_history = option_history.iloc[-self.lookback_window:]
-                
-                # Create time series for this option
                 time_series = []
                 
                 for _, row in recent_history.iterrows():
-                    # Extract features from historical data
+
                     current_S0 = row['UNDERLYING_PRICE']
                     current_K = config['K']  # Strike price doesn't change
-                    current_T = row['TIME_TO_MATURITY']  # Time to maturity decreases as we approach expiry
+                    current_T = row['TIME_TO_MATURITY']  
                     current_r = row['RISK_FREE_RATE']
                     
                     # Get implied volatility
@@ -183,52 +162,37 @@ class LSTMOptionPricer:
                                 current_sigma = row[vol_column]
                                 break
                     
-                    # Skip if no valid volatility found
                     if pd.isna(current_sigma) or current_sigma <= 0:
                         current_sigma = config['sigma']  # Fallback to provided sigma
                     
-                    # Convert volatility from percentage if needed
                     if current_sigma > 1:
                         current_sigma = current_sigma / 100
                     
-                    # Calculate derived features
                     current_moneyness = current_S0 / current_K
                     current_log_moneyness = np.log(current_moneyness)
                     current_sigma_sqrt_t = current_sigma * np.sqrt(current_T)
                     current_time_decay_factor = np.exp(-current_r * current_T)
                     
-                    # Create feature vector
                     current_feature = [
                         current_S0, current_K, current_T, current_r, current_sigma,
                         current_moneyness, current_log_moneyness, current_sigma_sqrt_t, current_time_decay_factor
                     ]
                     
-                    # Scale this feature
                     current_feature_scaled = self.feature_scaler.transform([current_feature])[0]
                     time_series.append(current_feature_scaled)
                 
-                # Only add if we have a complete time series
                 if len(time_series) == self.lookback_window:
                     X.append(time_series)
         else:
-            # Fall back to the synthetic time series generation if no historical data is provided
+            # fallback to the synthetic time series generation if no historical data is provided
             for i, feature in enumerate(features_scaled):
-                # Create a time series for this option
                 time_series = []
                 config = option_configs[i]
                 
-                # Generate synthetic time points for this option
                 for j in range(self.lookback_window):
-                    # Time fraction (0 to 1)
                     time_frac = j / (self.lookback_window - 1)
-                    
-                    # Adjust time to maturity
                     adjusted_T = config['T'] * (1 - time_frac)
-                    
-                    # Recalculate features with the adjusted time
                     adjusted_feature = self._create_adjusted_feature(config, adjusted_T, time_frac)
-                    
-                    # Scale this adjusted feature
                     adjusted_feature_scaled = self.feature_scaler.transform([adjusted_feature])[0]
                     time_series.append(adjusted_feature_scaled)
                 
@@ -237,7 +201,7 @@ class LSTMOptionPricer:
         X = np.array(X)
         
         if prices is not None:
-            # If prices are provided, prepare target values
+            # if prices are provided, prepare target values
             prices = np.array(prices).reshape(-1, 1)
             
             if not self.is_trained:
@@ -248,20 +212,24 @@ class LSTMOptionPricer:
         else:
             return X
     
-    def _create_adjusted_feature(self, config, adjusted_T, time_frac):
-        """Create adjusted feature vector with new time to maturity."""
+    def _create_adjusted_feature(self, config, adjusted_T):
+        """
+        Create adjusted feature vector with new time to maturity.
+        
+        :param config: Option configuration dictionary
+        :param adjusted_T: Adjusted time to maturity
+        :return: Adjusted feature vector
+        """
         S0 = config['S0']
         K = config['K']
         r = config['r']
         sigma = config['sigma']
         
-        # Common features
         moneyness = S0 / K
         log_moneyness = np.log(moneyness)
         sigma_sqrt_t = sigma * np.sqrt(adjusted_T)
         adjusted_time_decay = np.exp(-r * adjusted_T)
         
-        # Base feature vector
         adjusted_feature = [S0, K, adjusted_T, r, sigma, moneyness, log_moneyness, sigma_sqrt_t, adjusted_time_decay]
         
         # Add Asian-specific features if needed
@@ -273,20 +241,27 @@ class LSTMOptionPricer:
         return adjusted_feature
     
     def train(self, option_configs, prices, historical_data=None, validation_split=0.4, epochs=100, batch_size=32, verbose=1):
-        """Train the LSTM model on option prices."""
-        # Prepare time series data
+        """
+        Train the LSTM model on option prices.
+        
+        :param option_configs: List of option configuration dictionaries
+        :param prices: Option prices for training data
+        :param historical_data: DataFrame containing historical time series data for options
+        :param validation_split: Fraction of data to use for validation
+        :param epochs: Number of training epochs
+        :param batch_size: Batch size for training
+        :param verbose: Verbosity mode (0, 1, or 2)
+        :return: Training history and time taken
+        """
         X, y = self._prepare_time_series(option_configs, prices, historical_data)
         
-        # Split into training and validation sets
         X_train, X_val, y_train, y_val = train_test_split(
             X, y, test_size=validation_split, random_state=42
         )
         
-        # Build the model
         input_shape = (X.shape[1], X.shape[2])
         self.model = self._build_model(input_shape)
         
-        # Callbacks for training
         callbacks = [
             EarlyStopping(
                 monitor='val_loss',
@@ -301,7 +276,6 @@ class LSTMOptionPricer:
             )
         ]
         
-        # Train the model
         start_time = time.time()
         history = self.model.fit(
             X_train, y_train,
@@ -322,19 +296,22 @@ class LSTMOptionPricer:
         }
     
     def predict_price(self, option_configs, historical_data=None):
-        """Predict option prices using the trained LSTM model."""
+        """
+        Predict option prices using the trained LSTM model.
+        
+        :param option_configs: List of option configuration dictionaries
+        :param historical_data: DataFrame containing historical time series data for options
+        :return: Predicted option prices and time taken for prediction
+        """
         if not self.is_trained:
             raise ValueError("Model must be trained before prediction")
         
-        # Prepare time series data
         X = self._prepare_time_series(option_configs, historical_data=historical_data)
         
-        # Predict
         start_time = time.time()
         y_pred_scaled = self.model.predict(X)
         prediction_time = time.time() - start_time
         
-        # Inverse transform to get actual prices
         y_pred = self.price_scaler.inverse_transform(y_pred_scaled)
         
         return y_pred.flatten(), prediction_time
@@ -343,31 +320,19 @@ def prepare_historical_data(df):
     """
     Prepare historical data for options by organizing by security description.
     
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        DataFrame containing option market data with time series
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        DataFrame with all historical data
+    :param df: DataFrame containing option market data
+    :return: DataFrame with organized historical data
     """
-    # Make a copy to avoid modifying the original dataframe
     df_copy = df.copy()
     
-    # Ensure the Date column is in datetime format
     if 'Date' in df_copy.columns and not pd.api.types.is_datetime64_dtype(df_copy['Date']):
         df_copy['Date'] = pd.to_datetime(df_copy['Date'])
     
-    # Ensure EXPIRE_DT is in datetime format if it exists
     if 'EXPIRE_DT' in df_copy.columns and not pd.api.types.is_datetime64_dtype(df_copy['EXPIRE_DT']):
         df_copy['EXPIRE_DT'] = pd.to_datetime(df_copy['EXPIRE_DT'])
     
-    # Sort by security description and date
     df_sorted = df_copy.sort_values(['SECURITY_DES', 'Date'])
     
-    # Calculate time to maturity if not already present and if we have the necessary columns
     if 'TIME_TO_MATURITY' not in df_sorted.columns and 'EXPIRE_DT' in df_sorted.columns and 'Date' in df_sorted.columns:
         df_sorted['TIME_TO_MATURITY'] = (df_sorted['EXPIRE_DT'] - df_sorted['Date']).dt.days / 365.0
     
@@ -375,14 +340,18 @@ def prepare_historical_data(df):
 
 
 def custom_prepare_option_data(df):
-    """Custom function to prepare option configurations from market data DataFrame."""
+    """
+    Custom function to prepare option configurations from market data DataFrame.
+    
+    :param df: DataFrame containing option market data
+    :return: Tuple of option configurations and market prices
+    """
     option_configs = []
     market_prices = []
     
-    # Get unique options by taking the most recent data point for each security description
+    # get unique options by taking the most recent data point for each security description
     unique_options = df.sort_values('Date').groupby('SECURITY_DES').last().reset_index()
     
-    # Filter for call options and valid data
     filtered_df = unique_options[
         (unique_options['TIME_TO_MATURITY'] > 0) &
         (unique_options['OPT_PX'] > 0) &
@@ -391,34 +360,28 @@ def custom_prepare_option_data(df):
     ]
     
     for idx, row in filtered_df.iterrows():
-        # Get volatility
         sigma = row['HIST_CALL_IMP_VOL']
         
-        # Fallback to alternative volatility if needed
         if pd.isna(sigma) or sigma <= 0:
-            # Try using alternative volatility metrics
             for vol_column in ['VOLATILITY_30D', 'VOLATILITY_20D', 'VOLATILITY_60D', 'VOLATILITY_90D', 'VOLATILITY_10D']:
                 if vol_column in row and not pd.isna(row[vol_column]) and row[vol_column] > 0:
                     sigma = row[vol_column]
                     break
             
-            # Skip if no valid volatility found
             if pd.isna(sigma) or sigma <= 0:
                 continue
         
-        # Convert volatility from percentage if needed
         if sigma > 1:
             sigma = sigma / 100
         
-        # Create option configuration
         config = {
-            'name': row['SECURITY_DES'],  # Make sure to include the security description
+            'name': row['SECURITY_DES'],  
             'S0': row['UNDERLYING_PRICE'],
             'K': row['STRIKE_PX'],
             'T': row['TIME_TO_MATURITY'],
             'r': row['RISK_FREE_RATE'],
             'sigma': sigma,
-            'option_type': 'arithmetic'  # For Asian options
+            'option_type': 'arithmetic'  # for Asian options
         }
         
         option_configs.append(config)
@@ -426,30 +389,21 @@ def custom_prepare_option_data(df):
     
     return option_configs, market_prices
 
-# Modify the evaluate_lstm_model function to return results without plotting
+
 def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_class=None, 
                         option_type='asian', plot=False, cv=True, save_data=True):
     """
     Evaluate LSTM models against market data and Monte Carlo pricing.
     
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        DataFrame containing option market data with time series data
-    lstm_configs : list of dict
-        List of LSTM configurations to compare
-    mc_pricer : MCPricer
-        Monte Carlo pricer instance
-    asian_option_class : class
-        Asian option class
-    option_type : str
-        Type of option to price
-    plot : bool
-        Whether to plot results immediately (default: False)
-    cv : bool
-        Whether to use control variates in Monte Carlo pricing
-    save_data : bool
-        Whether to save processed data to CSV files
+    :param df: DataFrame containing option market data
+    :param lstm_configs: List of LSTM model configurations
+    :param mc_pricer: Monte Carlo pricer instance
+    :param asian_option_class: Asian option class for pricing
+    :param option_type: Type of option to price ('regular', 'asian', etc.)
+    :param plot: Whether to plot evaluation results
+    :param cv: Whether to use control variate for Monte Carlo pricing
+    :param save_data: Whether to save processed data to CSV files
+    :return: Evaluation results including LSTM model performance
     """
     if lstm_configs is None:
         lstm_configs = [
@@ -644,12 +598,9 @@ def plot_evaluation_results(results, max_options=None):
     """
     Plot key evaluation metrics for LSTM models.
     
-    Parameters:
-    -----------
-    results : dict
-        Evaluation results from evaluate_lstm_model
-    max_options : int, optional
-        Maximum number of options to display in plots. If None, display all.
+    :param results: Evaluation results dictionary
+    :param max_options: Maximum number of options to display in plots. If None, display all.
+    :return: None
     """
     test_prices = results['test_prices']
     lstm_results = results['lstm_results']
@@ -798,16 +749,11 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
     """
     Run a complete example of LSTM option pricing.
     
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        DataFrame containing option market data
-    save_results : bool
-        Whether to save results to disk
-    plot_now : bool
-        Whether to plot results immediately
-    save_data : bool
-        Whether to save processed data to CSV files
+    :param df: DataFrame containing option market data
+    :param save_results: Whether to save the evaluation results
+    :param plot_now: Whether to plot results immediately
+    :param save_data: Whether to save processed data to CSV files
+    :return: Evaluation results
     """
     mc_pricer = MCPricer(n_sims=10000, n_steps=252)
     
@@ -871,12 +817,9 @@ def plot_saved_results(filename='lstm_evaluation_results.pkl', max_options=20):
     """
     Plot results from a saved evaluation file with option to limit the number of displayed options.
     
-    Parameters:
-    -----------
-    filename : str
-        Path to the saved results file
-    max_options : int or None
-        Maximum number of options to display in plots. If None, display all.
+    :param filename: Path to the saved evaluation results file
+    :param max_options: Maximum number of options to display in plots
+    :return: Evaluation results
     """
     results = load_evaluation_results(filename)
     plot_evaluation_results(results, max_options=max_options)
@@ -888,26 +831,16 @@ def save_processed_data(historical_data, option_configs, market_prices, train_co
     """
     Save all processed data structures to CSV files for inspection.
     
-    Parameters:
-    -----------
-    historical_data : pandas.DataFrame
-        Processed historical data from prepare_historical_data()
-    option_configs : list of dict
-        Option configuration dictionaries
-    market_prices : list
-        Market prices for all options
-    train_configs : list of dict
-        Training set option configurations
-    train_prices : list
-        Training set market prices
-    test_configs : list of dict
-        Test set option configurations
-    test_prices : list
-        Test set market prices
-    mc_prices : list, optional
-        Monte Carlo prices for test set if available
-    base_filename : str
-        Base name for output files
+    :param historical_data: DataFrame containing historical data
+    :param option_configs: List of option configurations
+    :param market_prices: List of market prices for options
+    :param train_configs: List of training option configurations
+    :param train_prices: List of training option prices
+    :param test_configs: List of test option configurations
+    :param test_prices: List of test option prices
+    :param mc_prices: List of Monte Carlo prices (optional)
+    :param base_filename: Base name for output files
+    :return: Dictionary with paths to saved files
     """
     os.makedirs("processed_data", exist_ok=True)
     
@@ -949,16 +882,11 @@ def save_lstm_input_dataset(lstm_pricer, option_configs, historical_data, base_f
     """
     Save the entire processed LSTM input dataset to CSV for inspection.
 
-    Parameters:
-    -----------
-    lstm_pricer : LSTMOptionPricer
-        Trained LSTM pricer instance
-    option_configs : list of dict
-        Option configurations to prepare
-    historical_data : pandas.DataFrame
-        Historical data DataFrame
-    base_filename : str
-        Base name for output file
+    :param lstm_pricer: LSTMOptionPricer instance
+    :param option_configs: List of option configurations
+    :param historical_data: DataFrame containing historical data
+    :param base_filename: Base name for output file
+    :return: Path to the saved CSV file
     """
     os.makedirs("processed_data", exist_ok=True)
 
@@ -999,16 +927,11 @@ def save_mc_option_details(test_configs, mc_pricer, asian_option_class, base_fil
     """
     Save Monte Carlo option objects to CSV with all relevant parameters.
 
-    Parameters:
-    -----------
-    test_configs : list of dict
-        Test set option configurations
-    mc_pricer : MCPricer
-        Monte Carlo pricer instance
-    asian_option_class : class
-        Asian option class
-    base_filename : str
-        Base name for output file
+    :param test_configs: List of option configurations for testing
+    :param mc_pricer: Monte Carlo pricer instance
+    :param asian_option_class: Instance of AsianOption class
+    :param base_filename: Base name for output file
+    :return: Path to the saved CSV file
     """
     os.makedirs("processed_data", exist_ok=True)
 
@@ -1060,21 +983,11 @@ def inspect_saved_data(csv_path, show_head=True, show_info=True, show_stats=True
     """
     Load and inspect a saved CSV file.
     
-    Parameters:
-    -----------
-    csv_path : str
-        Path to the CSV file
-    show_head : bool
-        Whether to show the first few rows
-    show_info : bool
-        Whether to show DataFrame info
-    show_stats : bool
-        Whether to show descriptive statistics
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        The loaded DataFrame
+    :param csv_path: Path to the CSV file
+    :param show_head: Whether to show the first few rows
+    :param show_info: Whether to show column information
+    :param show_stats: Whether to show descriptive statistics
+    :return: DataFrame containing the loaded data
     """    
     df = pd.read_csv(csv_path)
     
@@ -1100,17 +1013,9 @@ def compare_time_series_data(time_series_csvs, key_columns=None):
     """
     Compare the most populated time series from multiple CSVs.
     
-    Parameters:
-    -----------
-    time_series_csvs : list
-        List of paths to time series CSV files
-    key_columns : list
-        List of column names to focus on (if None, use all numeric columns except 'time_step' and 'config_name')
-        
-    Returns:
-    --------
-    dict
-        Dictionary of filtered DataFrames
+    :param time_series_csvs: List of paths to CSV files containing time series data
+    :param key_columns: List of key columns to compare (optional)
+    :return: Dictionary of filtered DataFrames
     """
     dfs = {}
     filtered_dfs = {}
@@ -1165,17 +1070,9 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
     """
     Compare LSTM and MC price predictions against market prices.
     
-    Parameters:
-    -----------
-    results_csv : str
-        Path to the test options CSV with LSTM and MC prices
-    plot : bool
-        Whether to plot comparisons
-        
-    Returns:
-    --------
-    pandas.DataFrame
-        DataFrame with comparisons
+    :param results_csv: Path to the CSV file containing LSTM and MC predictions
+    :param plot: Whether to plot the results
+    :return: DataFrame containing the loaded data and error metrics
     """
     df = pd.read_csv(results_csv)
     
@@ -1256,16 +1153,11 @@ def plot_time_series_diagnostics(lstm_pricer, option_configs, historical_data, n
     """
     Plot time series data for diagnostic purposes.
 
-    Parameters:
-    -----------
-    lstm_pricer : LSTMOptionPricer
-        Trained LSTM pricer instance
-    option_configs : list of dict
-        Option configurations to prepare
-    historical_data : pandas.DataFrame
-        Historical data DataFrame
-    num_options : int
-        Number of options to plot for diagnostics
+    :param lstm_pricer: LSTMOptionPricer instance
+    :param option_configs: List of option configurations
+    :param historical_data: DataFrame containing historical data
+    :param num_options: Number of options to plot
+    :return: None
     """
     X = lstm_pricer._prepare_time_series(option_configs, historical_data=historical_data)
 
