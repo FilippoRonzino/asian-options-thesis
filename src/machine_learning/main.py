@@ -1,6 +1,6 @@
 from evaluation import evaluate_lstm_model, save_evaluation_results, save_mc_option_details
 from constructors.asianoption import AsianOption
-from monte_carlo.mcpricer import MCPricer
+from monte_carlo.mc_pricer import MCPricer
 
 
 def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=True):

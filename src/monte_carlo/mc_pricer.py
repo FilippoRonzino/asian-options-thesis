@@ -1,7 +1,5 @@
-from asianoption import AsianOption
+from constructors.asianoption import AsianOption
 import numpy as np
-from scipy.stats import norm
-import matplotlib.pyplot as plt
 
 class MCPricer:
     def __init__(self, n_sims=10000, n_steps=252):

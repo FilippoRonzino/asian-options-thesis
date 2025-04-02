@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from machine_learning.data_preparation import (
+from data_preparation import (
     custom_prepare_option_data,
     prepare_historical_data,
 )
-from machine_learning.lstm_option_pricer import LSTMOptionPricer
+from lstm_option_pricer import LSTMOptionPricer
 from constructors.asianoption import AsianOption
-from monte_carlo.mcpricer import MCPricer
+from monte_carlo.mc_pricer import MCPricer
 
 
 def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_class=None, 
@@ -801,3 +801,7 @@ def plot_time_series_diagnostics(lstm_pricer, option_configs, historical_data, n
         plt.legend()
         plt.grid(True)
         plt.show()
+
+
+if __name__ == "__main__":
+    pass
