@@ -1,5 +1,6 @@
-from constructors.asianoption import AsianOption
+from src.constructors.asianoption import AsianOption
 import numpy as np
+
 
 class MCPricer:
     def __init__(self, n_sims=10000, n_steps=252):

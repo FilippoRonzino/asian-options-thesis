@@ -1,5 +1,5 @@
 import numpy as np
-from baseoption import BaseOption
+from src.constructors.baseoption import BaseOption
 from scipy.stats import norm
 
 

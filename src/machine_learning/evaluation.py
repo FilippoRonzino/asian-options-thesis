@@ -12,8 +12,8 @@ from data_preparation import (
     prepare_historical_data,
 )
 from lstm_option_pricer import LSTMOptionPricer
-from constructors.asianoption import AsianOption
-from monte_carlo.mc_pricer import MCPricer
+from src.constructors.asianoption import AsianOption
+from src.monte_carlo.mc_pricer import MCPricer
 
 
 def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_class=None, 
