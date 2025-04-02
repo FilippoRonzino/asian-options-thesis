@@ -1,24 +1,16 @@
-import time
-
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
+import numpy as np
 import tensorflow as tf
-from asianoption import AsianOption
-from mcpricer import MCPricer
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.layers import (
-    LSTM,
-    BatchNormalization,
-    Bidirectional,
-    Dense,
-    Dropout,
-)
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization, Bidirectional
 from tensorflow.keras.optimizers import Adam
-
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import time
+from mcpricer import MCPricer
+from asianoption import AsianOption
 
 class LSTMOptionPricer:
     """
@@ -847,7 +839,7 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
                 'lstm_units': [32],
                 'dropout_rate': 0.1,
                 'bidirectional': False,
-                'lookback_window': 10,
+                'lookback_window': 20,
                 'option_type': 'asian'
             }
         },
@@ -867,7 +859,7 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
                 'lstm_units': [48, 24],
                 'dropout_rate': 0.2,
                 'bidirectional': True,
-                'lookback_window': 15,
+                'lookback_window': 20,
                 'option_type': 'asian'
             }
         }
@@ -942,9 +934,8 @@ def save_processed_data(historical_data, option_configs, market_prices, train_co
     base_filename : str
         Base name for output files
     """
-    import os
-
     import pandas as pd
+    import os
     
     # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
@@ -999,10 +990,9 @@ def save_lstm_input_dataset(lstm_pricer, option_configs, historical_data, base_f
     base_filename : str
         Base name for output file
     """
-    import os
-
-    import numpy as np
     import pandas as pd
+    import numpy as np
+    import os
 
     # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
@@ -1066,9 +1056,8 @@ def save_mc_option_details(test_configs, mc_pricer, asian_option_class, base_fil
     base_filename : str
         Base name for output file
     """
-    import os
-
     import pandas as pd
+    import os
 
     # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
@@ -1180,8 +1169,8 @@ def compare_time_series_data(time_series_csvs, key_columns=None):
     dict
         Dictionary of filtered DataFrames
     """
-    import matplotlib.pyplot as plt
     import pandas as pd
+    import matplotlib.pyplot as plt
     
     dfs = {}
     filtered_dfs = {}
@@ -1250,9 +1239,9 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
     pandas.DataFrame
         DataFrame with comparisons
     """
+    import pandas as pd
     import matplotlib.pyplot as plt
     import numpy as np
-    import pandas as pd
     
     # Load the data
     df = pd.read_csv(results_csv)
