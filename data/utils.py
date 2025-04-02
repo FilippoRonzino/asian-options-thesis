@@ -1,5 +1,3 @@
-
-
 def get_ticker_by_value_count(df, strike, value_count):
     """
     Get the ticker with the most occurrences in the dataframe for a given strike price. 
