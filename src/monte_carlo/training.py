@@ -1,16 +1,26 @@
-import pandas as pd
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization, Bidirectional
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+import os
+import pickle
 import time
-from mcpricer import MCPricer
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import tensorflow as tf
 from asianoption import AsianOption
+from mcpricer import MCPricer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.layers import (
+    LSTM,
+    BatchNormalization,
+    Bidirectional,
+    Dense,
+    Dropout,
+)
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+
 
 class LSTMOptionPricer:
     """
@@ -472,10 +482,7 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             }
         ]
     
-    # Prepare historical data
     historical_data = prepare_historical_data(df)
-    
-    # Prepare option data using our custom function
     option_configs, market_prices = custom_prepare_option_data(df)
     
     if len(option_configs) == 0:
@@ -483,13 +490,13 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
     
     print(f"Prepared {len(option_configs)} valid option configurations from market data")
     
-    # Split data - ensure we're splitting by unique security descriptions
+    # splitting by unique security descriptions
     unique_securities = list({config['name'] for config in option_configs})
     train_securities, test_securities = train_test_split(
         unique_securities, test_size=0.4, random_state=42
     )
     
-    # Create training and test sets based on security descriptions
+    # training and test sets based on security descriptions
     train_configs = [config for config in option_configs if config['name'] in train_securities]
     train_prices = [market_prices[i] for i, config in enumerate(option_configs) if config['name'] in train_securities]
     
@@ -498,7 +505,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
     
     print(f"Training set: {len(train_configs)} options, Test set: {len(test_configs)} options")
     
-    # Calculate Monte Carlo prices if needed
     mc_prices = []
     mc_times = []
     
@@ -507,7 +513,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
         for i, config in enumerate(test_configs):
             print(f"Processing option {i+1}/{len(test_configs)}")
             
-            # Create option and price it
             option = asian_option_class(
                 config['S0'], config['K'], config['T'], 
                 config['r'], config['sigma'], 
@@ -521,7 +526,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             mc_prices.append(price)
             mc_times.append(mc_time)
     
-    # Save processed data if requested
     if save_data:
         print("\nSaving processed data to CSV files...")
         save_processed_data(
@@ -535,7 +539,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             mc_prices=mc_prices if mc_prices else None
         )
     
-    # Train and evaluate each LSTM model
     lstm_results = {}
     
     for config in lstm_configs:
@@ -544,12 +547,9 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
         
         print(f"\nTraining {name}...")
         
-        # Create and train the model
         lstm_pricer = LSTMOptionPricer(**params)
         plot_time_series_diagnostics(lstm_pricer, option_configs, historical_data)
 
-        
-        # Pass the historical data to the training function
         training_result = lstm_pricer.train(
             train_configs, 
             train_prices, 
@@ -558,7 +558,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             verbose=1
         )
         
-        # Save a sample of LSTM input data if requested
         if save_data:
             print(f"Saving sample LSTM input data for {name}...")
             save_lstm_input_dataset(
@@ -568,13 +567,11 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
                 base_filename=f"lstm_input_{name.lower().replace(' ', '_')}"
             )
         
-        # Predict prices using historical data
         lstm_prices, prediction_time = lstm_pricer.predict_price(
             test_configs,
             historical_data=historical_data
         )
         
-        # Calculate metrics vs market prices
         market_abs_errors = np.abs(lstm_prices - test_prices)
         market_rel_errors = market_abs_errors / np.array(test_prices)
         
@@ -591,7 +588,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             'training_result': training_result
         }
         
-        # Add Monte Carlo comparison if available
         if mc_prices:
             mc_abs_errors = np.abs(lstm_prices - mc_prices)
             mc_rel_errors = mc_abs_errors / np.array(mc_prices)
@@ -608,7 +604,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
         
         lstm_results[name] = results
         
-        # Print results summary
         print(f"{name} test results:")
         print(f"  Against market prices:")
         print(f"    Mean absolute error: {results['mean_market_abs_error']:.6f}")
@@ -625,7 +620,6 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
         print(f"  Performance:")
         print(f"    Avg prediction time per option: {results['prediction_time_per_option']:.6f} seconds")
     
-    # Compile results
     evaluation_results = {
         'train_configs': train_configs,
         'train_prices': train_prices,
@@ -640,14 +634,12 @@ def evaluate_lstm_model(df, lstm_configs=None, mc_pricer=None, asian_option_clas
             'mc_times': mc_times
         })
     
-    # Only plot if explicitly requested
     if plot:
         plot_evaluation_results(evaluation_results)
     
     return evaluation_results
 
 
-# Create a modified plotting function with option to limit number of displayed options
 def plot_evaluation_results(results, max_options=None):
     """
     Plot key evaluation metrics for LSTM models.
@@ -666,17 +658,14 @@ def plot_evaluation_results(results, max_options=None):
     variant_names = list(lstm_results.keys())
     total_options = len(test_prices)
     
-    # Determine how many options to plot
     if max_options is not None and max_options < total_options:
-        # Select evenly spaced options if we need to limit
+        # select evenly spaced options if we need to limit
         indices = np.linspace(0, total_options-1, max_options, dtype=int)
         option_ids = [f"{i+1}" for i in indices]
         
-        # Filter the data
         plot_test_prices = [test_prices[i] for i in indices]
         plot_mc_prices = [mc_prices[i] for i in indices] if mc_prices else None
         
-        # Also filter the LSTM results
         plot_lstm_results = {}
         for name in variant_names:
             plot_lstm_results[name] = {
@@ -688,7 +677,6 @@ def plot_evaluation_results(results, max_options=None):
         
         print(f"Showing {max_options} options out of {total_options} total options")
     else:
-        # Use all options
         option_ids = [f"{i+1}" for i in range(total_options)]
         plot_test_prices = test_prices
         plot_mc_prices = mc_prices
@@ -789,22 +777,16 @@ def plot_evaluation_results(results, max_options=None):
     plt.tight_layout()
     plt.show()
 
-# Function to save evaluation results to disk
 def save_evaluation_results(results, filename='lstm_evaluation_results.pkl'):
     """Save evaluation results to disk for later use."""
-    import pickle
-    
     with open(filename, 'wb') as f:
         pickle.dump(results, f)
     
     print(f"Results saved to {filename}")
 
 
-# Function to load saved evaluation results
 def load_evaluation_results(filename='lstm_evaluation_results.pkl'):
-    """Load evaluation results from disk."""
-    import pickle
-    
+    """Load evaluation results from disk."""    
     with open(filename, 'rb') as f:
         results = pickle.load(f)
     
@@ -812,7 +794,6 @@ def load_evaluation_results(filename='lstm_evaluation_results.pkl'):
     return results
 
 
-# Example usage with the new functions
 def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=True):
     """
     Run a complete example of LSTM option pricing.
@@ -828,10 +809,8 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
     save_data : bool
         Whether to save processed data to CSV files
     """
-    # Create Monte Carlo pricer
     mc_pricer = MCPricer(n_sims=10000, n_steps=252)
     
-    # Configure LSTM models
     lstm_configs = [
         {
             'name': 'Simple LSTM',
@@ -865,7 +844,6 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
         }
     ]
     
-    # Run evaluation with saving data if requested
     results = evaluate_lstm_model(
         df,
         lstm_configs=lstm_configs,
@@ -876,7 +854,6 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
         save_data=save_data
     )
     
-    # Save MC option details if requested
     if save_data and mc_pricer is not None and 'test_configs' in results:
         save_mc_option_details(
             results['test_configs'],
@@ -884,14 +861,12 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
             AsianOption
         )
     
-    # Save results if requested
     if save_results:
         save_evaluation_results(results)
     
     return results
 
 
-# Function to plot saved results
 def plot_saved_results(filename='lstm_evaluation_results.pkl', max_options=20):
     """
     Plot results from a saved evaluation file with option to limit the number of displayed options.
@@ -934,10 +909,6 @@ def save_processed_data(historical_data, option_configs, market_prices, train_co
     base_filename : str
         Base name for output files
     """
-    import pandas as pd
-    import os
-    
-    # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
     
     # 1. Save historical data
@@ -945,7 +916,6 @@ def save_processed_data(historical_data, option_configs, market_prices, train_co
     print(f"Saved historical data to processed_data/{base_filename}_historical_data.csv")
     
     # 2. Save option configurations and prices
-    # Convert list of dictionaries to DataFrame
     config_df = pd.DataFrame(option_configs)
     config_df['market_price'] = market_prices
     config_df.to_csv(f"processed_data/{base_filename}_all_options.csv", index=False)
@@ -990,50 +960,34 @@ def save_lstm_input_dataset(lstm_pricer, option_configs, historical_data, base_f
     base_filename : str
         Base name for output file
     """
-    import pandas as pd
-    import numpy as np
-    import os
-
-    # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
 
-    # Prepare time series data for all options
     X = lstm_pricer._prepare_time_series(option_configs, historical_data=historical_data)
-
-    # Create a DataFrame to store the entire dataset
     all_data = []
 
     for i, time_series in enumerate(X):
-        # Create DataFrame from the time series
         feature_names = [
             'S0', 'K', 'T', 'r', 'sigma', 'moneyness',
             'log_moneyness', 'sigma_sqrt_t', 'time_decay_factor'
         ]
 
-        # If the data is scaled, we need to inverse transform it
         if lstm_pricer.is_trained:
             time_series_unscaled = lstm_pricer.feature_scaler.inverse_transform(time_series)
         else:
             time_series_unscaled = time_series
 
-        # Create DataFrame
         ts_df = pd.DataFrame(time_series_unscaled, columns=feature_names)
 
-        # Add time step index
         ts_df['time_step'] = range(len(ts_df))
 
-        # Add option details
         for key, value in option_configs[i].items():
             if key not in ts_df.columns and not isinstance(value, dict) and not isinstance(value, list):
                 ts_df[f'config_{key}'] = value
 
-        # Append to the list
         all_data.append(ts_df)
 
-    # Concatenate all data into a single DataFrame
     all_data_df = pd.concat(all_data, keys=range(len(all_data)))
 
-    # Save to CSV
     filename = f"processed_data/{base_filename}.csv"
     all_data_df.to_csv(filename, index=True)
     print(f"Saved entire LSTM input dataset to {filename}")
@@ -1056,24 +1010,18 @@ def save_mc_option_details(test_configs, mc_pricer, asian_option_class, base_fil
     base_filename : str
         Base name for output file
     """
-    import pandas as pd
-    import os
-
-    # Create output directory if it doesn't exist
     os.makedirs("processed_data", exist_ok=True)
 
     mc_options_data = []
 
     print("Creating detailed Monte Carlo option data...")
     for i, config in enumerate(test_configs):
-        # Create option object
         option = asian_option_class(
             config['S0'], config['K'], config['T'],
             config['r'], config['sigma'],
             n_steps=252, option_type=config['option_type']
         )
 
-        # Get all option parameters and Monte Carlo config
         option_data = {
             'option_id': i+1,
             'security_name': config.get('name', f'Option_{i+1}'),
@@ -1089,7 +1037,6 @@ def save_mc_option_details(test_configs, mc_pricer, asian_option_class, base_fil
             'random_number_generator': str(mc_pricer.__class__.__name__),
         }
 
-        # Add pricing results
         price = mc_pricer.price(option, use_control_variate=True)
         price_no_cv = mc_pricer.price(option, use_control_variate=False)
 
@@ -1101,7 +1048,6 @@ def save_mc_option_details(test_configs, mc_pricer, asian_option_class, base_fil
 
         mc_options_data.append(option_data)
 
-    # Save to CSV
     mc_df = pd.DataFrame(mc_options_data)
     filename = f"processed_data/{base_filename}.csv"
     mc_df.to_csv(filename, index=False)
@@ -1129,10 +1075,7 @@ def inspect_saved_data(csv_path, show_head=True, show_info=True, show_stats=True
     --------
     pandas.DataFrame
         The loaded DataFrame
-    """
-    import pandas as pd
-    
-    # Load the data
+    """    
     df = pd.read_csv(csv_path)
     
     print(f"Loaded data from {csv_path}")
@@ -1169,9 +1112,6 @@ def compare_time_series_data(time_series_csvs, key_columns=None):
     dict
         Dictionary of filtered DataFrames
     """
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    
     dfs = {}
     filtered_dfs = {}
     
@@ -1182,7 +1122,7 @@ def compare_time_series_data(time_series_csvs, key_columns=None):
         
         print(f"{name} (from {path}): Shape {df.shape}")
         
-        # Identify the most populated config_name
+        # most populated config_name
         top_config = df['config_name'].value_counts().idxmax()
         df_filtered = df[df['config_name'] == top_config]
         filtered_dfs[name] = df_filtered
@@ -1192,13 +1132,11 @@ def compare_time_series_data(time_series_csvs, key_columns=None):
         if key_columns is None:
             key_columns = [col for col in df.columns if col not in ['time_step', 'config_name']]
         
-        # Show min/max for key columns
         for col in key_columns:
             if col in df.columns:
                 print(f"  {col}: min={df_filtered[col].min():.4f}, max={df_filtered[col].max():.4f}, mean={df_filtered[col].mean():.4f}")
         print()
     
-    # Plot time series for key columns
     n_cols = len(key_columns)
     fig, axes = plt.subplots(n_cols, 1, figsize=(10, 3*n_cols))
     
@@ -1239,14 +1177,8 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
     pandas.DataFrame
         DataFrame with comparisons
     """
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
-    # Load the data
     df = pd.read_csv(results_csv)
     
-    # Check if we have the required columns
     required_cols = ['market_price']
     lstm_col = next((col for col in df.columns if 'lstm' in col.lower()), None)
     mc_col = next((col for col in df.columns if 'mc_price' in col.lower()), None)
@@ -1255,7 +1187,6 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
         print(f"CSV doesn't contain required price columns. Found columns: {df.columns.tolist()}")
         return df
     
-    # Calculate errors
     if lstm_col:
         df['lstm_abs_error'] = np.abs(df[lstm_col] - df['market_price'])
         df['lstm_rel_error'] = df['lstm_abs_error'] / df['market_price'] * 100
@@ -1268,7 +1199,6 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
             df['lstm_mc_diff'] = np.abs(df[lstm_col] - df[mc_col])
             df['lstm_mc_rel_diff'] = df['lstm_mc_diff'] / df[mc_col] * 100
     
-    # Show summary statistics
     print("Price comparison summary:")
     stats_cols = ['market_price']
     if lstm_col:
@@ -1280,7 +1210,6 @@ def compare_lstm_mc_predictions(results_csv, plot=True):
     
     print(df[stats_cols].describe())
     
-    # Plot if requested
     if plot:
         n_options = len(df)
         x = np.arange(n_options)
@@ -1338,12 +1267,8 @@ def plot_time_series_diagnostics(lstm_pricer, option_configs, historical_data, n
     num_options : int
         Number of options to plot for diagnostics
     """
-    import matplotlib.pyplot as plt
-
-    # Prepare time series data
     X = lstm_pricer._prepare_time_series(option_configs, historical_data=historical_data)
 
-    # Plot time series for the first few options
     for i in range(min(num_options, len(X))):
         time_series = X[i]
         time_steps = range(len(time_series))
