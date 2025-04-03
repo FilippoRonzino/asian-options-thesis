@@ -5,8 +5,13 @@ from baseoption import BaseOption
 class VanillaOption(BaseOption):
     def __init__(self, S0, K, T, r, sigma, option_type='european'):
         """
-        Initialize vanilla option
-        
+        Initialize vanilla option, wrapper around BaseOption
+
+        :param S0: Initial stock price
+        :param K: Strike price
+        :param T: Time to maturity in years
+        :param r: Risk-free rate
+        :param sigma: Volatility
         :param option_type: 'european' or 'american'
         """
         super().__init__(S0, K, T, r, sigma)

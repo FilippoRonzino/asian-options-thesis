@@ -6,8 +6,13 @@ from scipy.stats import norm
 class AsianOption(BaseOption):
     def __init__(self, S0, K, T, r, sigma, n_steps, option_type='arithmetic'):
         """
-        Initialize Asian option
+        Initialize Asian option, wrapper around BaseOption
 
+        :param S0: Initial stock price
+        :param K: Strike price
+        :param T: Time to maturity in years
+        :param r: Risk-free rate
+        :param sigma: Volatility
         :param n_steps: Number of time steps for averaging
         :param option_type: 'arithmetic' or 'geometric'
         """
