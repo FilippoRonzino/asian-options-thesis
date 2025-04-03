@@ -1,6 +1,6 @@
-from evaluation import evaluate_lstm_model, save_evaluation_results, save_mc_option_details
-from constructors.asianoption import AsianOption
-from monte_carlo.mc_pricer import MCPricer
+from src.machine_learning.evaluation import evaluate_lstm_model, save_evaluation_results, save_mc_option_details
+from src.constructors.asianoption import AsianOption
+from src.monte_carlo.mc_pricer import MCPricer
 
 
 def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=True):
@@ -14,9 +14,9 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
             'name': 'Simple LSTM',
             'params': {
                 'lstm_units': [32],
-                'dropout_rate': 0.1,
+                'dropout_rate': 0.2,
                 'bidirectional': False,
-                'lookback_window': 20,
+                'lookback_window': 10,
                 'option_type': 'asian'
             }
         },
@@ -26,7 +26,7 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
                 'lstm_units': [64, 32, 16],
                 'dropout_rate': 0.2,
                 'bidirectional': False,
-                'lookback_window': 20,
+                'lookback_window': 15,
                 'option_type': 'asian'
             }
         },
@@ -34,7 +34,7 @@ def run_option_pricing_example(df, save_results=True, plot_now=True, save_data=T
             'name': 'Bidirectional LSTM',
             'params': {
                 'lstm_units': [48, 24],
-                'dropout_rate': 0.2,
+                'dropout_rate': 0.3,
                 'bidirectional': True,
                 'lookback_window': 20,
                 'option_type': 'asian'

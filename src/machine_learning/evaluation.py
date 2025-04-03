@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from data_preparation import (
+from src.machine_learning.data_preparation import (
     custom_prepare_option_data,
     prepare_historical_data,
 )
-from lstm_option_pricer import LSTMOptionPricer
+from src.machine_learning.lstm_option_pricer import LSTMOptionPricer
 from src.constructors.asianoption import AsianOption
 from src.monte_carlo.mc_pricer import MCPricer
 
