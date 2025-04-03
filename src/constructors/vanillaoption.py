@@ -1,5 +1,5 @@
 import numpy as np
-from src.constructors.baseoption import BaseOption
+from baseoption import BaseOption
 
 
 class VanillaOption(BaseOption):
