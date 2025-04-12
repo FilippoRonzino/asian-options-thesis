@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
-from constructors.asianoption import AsianOption
-from monte_carlo.mc_pricer import MCPricer
+from src.constructors.asianoption import AsianOption
+from src.monte_carlo.mc_pricer import MCPricer
 
 
 def test_control_variate(S0, K, T, r, sigma, n_steps, n_sims_list, plot=True):

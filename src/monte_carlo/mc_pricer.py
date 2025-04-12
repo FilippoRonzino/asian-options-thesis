@@ -59,34 +59,35 @@ class MCPricer:
         else:
             return option.payoff(paths)
 
-    def price(self, option, use_control_variate=False, train_size=0.8) -> float:
+    def price(self, option, use_control_variate=False) -> float:
         """
-        Calculate option price with an optional train-test split
+        Calculate option price
         
         :param option: Option object
         :param use_control_variate: True to use control variate technique
-        :param train_size: Proportion of paths to use for training (default: 0.8)
         :return: Option price
         """
         payoffs = self.calculate_payoffs(option, use_control_variate)
-        train_index = int(self.n_sims * train_size)
-
-        train_payoffs = payoffs[:train_index]
-
-        return np.exp(-option.r * option.T) * np.mean(train_payoffs)
-
-    def std_error(self, option, use_control_variate=False, train_size=0.8) -> float:
+        return np.exp(-option.r * option.T) * np.mean(payoffs)
+    
+    def std_error(self, option, use_control_variate=False, n_bootstrap=1000) -> float:
         """
-        Calculate standard error of the price estimate using train-test split
+        Calculate standard error of the price estimate using bootstrapping
         
         :param option: Option object
         :param use_control_variate: True to use control variate technique
-        :param train_size: Proportion of paths to use for training (default: 0.8)
+        :param n_bootstrap: Number of bootstrap samples to generate (default: 1000)
         :return: Standard error of the price estimate
         """
         payoffs = self.calculate_payoffs(option, use_control_variate)
-        train_index = int(self.n_sims * train_size)
-
-        test_payoffs = payoffs[train_index:]
-
-        return np.exp(-option.r * option.T) * np.std(test_payoffs) / np.sqrt(len(test_payoffs))
+        discount_factor = np.exp(-option.r * option.T)
+        
+        # Generate bootstrap samples
+        bootstrap_means = np.zeros(n_bootstrap)
+        for i in range(n_bootstrap):
+            # Sample with replacement
+            bootstrap_sample = np.random.choice(payoffs, size=len(payoffs), replace=True)
+            bootstrap_means[i] = discount_factor * np.mean(bootstrap_sample)
+        
+        # Standard error is the standard deviation of the bootstrap distribution
+        return np.std(bootstrap_means)
