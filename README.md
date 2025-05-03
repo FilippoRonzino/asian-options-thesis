@@ -2,7 +2,7 @@
 This repo contains the code used in my thesis for the BSc in Mathematical and Computing Sciences for Artificial Intelligence (BAI) at Bocconi University.
 
 ## Abstract
-TODO
+This thesis analyzes methods for pricing Asian options, path-dependent derivatives crucial for managing volatility risk. Due to their averaging feature, pricing, especially for common arithmetic Asian options, is challenging. We compare three approaches: analytical solutions (available only for geometric Asian options), Monte Carlo simulations with variance reduction techniques, and Deep Learning using Long Short-Term Memory (LSTM) networks trained on historical data. Results confirm analytical tractability only for geometric types and the efficiency of MC with control variates for arithmetic ones. Advanced LSTM models demonstrate competitive accuracy against benchmarks and market prices, suggesting their potential as fast, data-driven alternatives. The study concludes that while analytical methods are limited, enhanced Monte Carlo and modern Deep Learning techniques offer robust and promising tools for Asian option valuation.
 
 ## Structure
 - `data/`: contains the fetchers and processors for the historical datasets used in the pricers.
