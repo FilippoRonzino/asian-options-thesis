@@ -1,4 +1,4 @@
-# Asian Options Pricing: From Analytical Solutions to Monte Carlo Simulations and Machine Learning
+# Asian Option Pricing: A Comparative Analysis of Analytical, Monte Carlo, and Deep Learning Methods
 This repo contains the code used in my thesis for the BSc in Mathematical and Computing Sciences for Artificial Intelligence (BAI) at Bocconi University.
 
 ## Abstract
